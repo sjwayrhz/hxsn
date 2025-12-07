@@ -179,7 +179,7 @@ Success!
 
 ## Step 6 – Download Let’s Encrypt SSL
 
-Install the prerequisites:
+Install the prerequisites: Install nginx
 
 Next, install the Certbot Let’s Encrypt client using the following commands.
 
@@ -222,59 +222,53 @@ Next, create an Nginx virtual host configuration file for Matrix Synapse.
 
 ```
 cat << 'EOF' >> /etc/nginx/conf.d/synapse.conf 
-# enforce HTTPS
+# -------------------------------------------------
+# Redirect all plain HTTP to HTTPS
+# -------------------------------------------------
 server {
-    # Client port
     listen 80;
+    listen [::]:80;
     server_name matrix.xmsx.dpdns.org;
     return 301 https://$host$request_uri;
 }
 
+# -------------------------------------------------
+# Main Synapse Server (Client API + Federation)
+# -------------------------------------------------
 server {
     server_name matrix.xmsx.dpdns.org;
 
     # Client port
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
+    listen 443 ssl;
+    listen [::]:443 ssl;
 
-    # Federation port
-    listen 8448 ssl http2 default_server;
-    listen [::]:8448 ssl http2 default_server;
+    # Federation port (Matrix standard port)
+    listen 8448 ssl;
+    listen [::]:8448 ssl;
+
+    # Enable HTTP/2 globally
+    http2 on;
 
     access_log  /var/log/nginx/synapse.access.log;
     error_log   /var/log/nginx/synapse.error.log;
 
-    # TLS configuration
+    # TLS config
     ssl_certificate /etc/letsencrypt/live/matrix.xmsx.dpdns.org/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/matrix.xmsx.dpdns.org/privkey.pem;
     ssl_trusted_certificate /etc/letsencrypt/live/matrix.xmsx.dpdns.org/chain.pem;
+
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
-    ssl_stapling on;
-    ssl_stapling_verify on;
     ssl_dhparam /etc/ssl/certs/dhparam.pem;
 
+    # Client & Federation API
     location /_matrix {
         proxy_pass http://localhost:8008;
         proxy_set_header X-Forwarded-For $remote_addr;
-        # Nginx by default only allows file uploads up to 1M in size
-        # Increase client_max_body_size to match max_upload_size defined in homeserver.yaml
+        proxy_set_header Host $host;
+
+        # Upload size follow Synapse config
         client_max_body_size 10M;
-    }
-}
-
-# This is used for Matrix Federation
-# which is using default TCP port '8448'
-server {
-    listen 8448 ssl;
-    server_name matrix.xmsx.dpdns.org;
-
-    ssl_certificate /etc/letsencrypt/live/matrix.xmsx.dpdns.org/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/matrix.xmsx.dpdns.org/privkey.pem;
-
-    location / {
-        proxy_pass http://localhost:8008;
-        proxy_set_header X-Forwarded-For $remote_addr;
     }
 }
 EOF
