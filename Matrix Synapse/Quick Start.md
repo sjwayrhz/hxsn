@@ -223,31 +223,19 @@ Next, create an Nginx virtual host configuration file for Matrix Synapse.
 ```
 cat << 'EOF' >> /etc/nginx/conf.d/synapse.conf 
 # -------------------------------------------------
-# Redirect all plain HTTP to HTTPS
-# -------------------------------------------------
-server {
-    listen 80;
-    listen [::]:80;
-    server_name matrix.xmsx.dpdns.org;
-    return 301 https://$host$request_uri;
-}
-
-# -------------------------------------------------
 # Main Synapse Server (Client API + Federation)
 # -------------------------------------------------
 server {
     server_name matrix.xmsx.dpdns.org;
 
-    # Client port
+    # Client port (HTTPS)
     listen 443 ssl;
     listen [::]:443 ssl;
+    http2 on;
 
     # Federation port (Matrix standard port)
     listen 8448 ssl;
     listen [::]:8448 ssl;
-
-    # Enable HTTP/2 globally
-    http2 on;
 
     access_log  /var/log/nginx/synapse.access.log;
     error_log   /var/log/nginx/synapse.error.log;
@@ -256,7 +244,6 @@ server {
     ssl_certificate /etc/letsencrypt/live/matrix.xmsx.dpdns.org/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/matrix.xmsx.dpdns.org/privkey.pem;
     ssl_trusted_certificate /etc/letsencrypt/live/matrix.xmsx.dpdns.org/chain.pem;
-
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
     ssl_dhparam /etc/ssl/certs/dhparam.pem;
@@ -267,8 +254,22 @@ server {
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header Host $host;
 
-        # Upload size follow Synapse config
+        # Upload size follows Synapse config
         client_max_body_size 10M;
+    }
+
+    # Well-known for client discovery
+    location /.well-known/matrix/client {
+        return 200 '{"m.homeserver": {"base_url": "https://matrix.xmsx.dpdns.org"}}';
+        default_type application/json;
+        add_header Access-Control-Allow-Origin *;
+    }
+
+    # Well-known for federation discovery
+    location /.well-known/matrix/server {
+        return 200 '{"m.server": "matrix.xmsx.dpdns.org:8448"}';
+        default_type application/json;
+        add_header Access-Control-Allow-Origin *;
     }
 }
 EOF
