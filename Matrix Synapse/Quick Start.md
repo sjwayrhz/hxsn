@@ -307,6 +307,8 @@ systemctl restart nginx
 
 You can now verify the Matrix Synapse installation using the URL **<https://matrix.xmsx.dpdns.org:8448/_matrix/static/>** on your web browser. You should see the following screen:
 
+Also can test in this website [federationtester](https://federationtester.matrix.org/)
+
 Congratulations! You have successfully installed Matrix Synapse on Ubuntu 24.04
 
 add user
