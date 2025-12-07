@@ -173,6 +173,7 @@ Copy certificate
 ```
 mkdir /etc/matrix-synapse/certs
 cp /etc/letsencrypt/live/matrix.xmsx.dpdns.org/* /etc/matrix-synapse/certs
+chown :matrix-synapse  /etc/matrix-synapse/certs/*
 ```
 
 Save and close the file, then restart the Matrix Synapse service to reload the changes.
