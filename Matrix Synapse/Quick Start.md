@@ -127,31 +127,52 @@ listeners:
     x_forwarded: true
     bind_addresses: ['::1', '127.0.0.1']
     resources:
-      - names: [client, federation]
+      - names: [client]
         compress: false
+
+  - port: 8448
+    tls: true
+    type: http
+    bind_addresses: ['::', '0.0.0.0']
+    resources:
+      - names: [federation]
+        compress: false
+
 database:
   name: sqlite3
   args:
     database: /var/lib/matrix-synapse/homeserver.db
+
 log_config: "/etc/matrix-synapse/log.yaml"
 media_store_path: /var/lib/matrix-synapse/media
 signing_key_path: "/etc/matrix-synapse/homeserver.signing.key"
+
 trusted_key_servers:
   - server_name: "matrix.org"
 
 server_name: "matrix.xmsx.dpdns.org"
-pid_file: "/var/run/matrix-synapse.pid"
 
 enable_registration: false
 registration_shared_secret: "WQtYKxi8bZBJVzxE7vI8R0glY7E2BY5Y"
 
-trusted_key_servers:
-  - server_name: "matrix.org"
-
 turn_uris: ["turn:matrix.xmsx.dpdns.org:3478?transport=udp"]
 turn_shared_secret: "a28ba88cd6660d00da7260e95753671bc4252ede01714c8bb076afbeca8e8c2a"
 turn_user_lifetime: 86400
+
+# Federation TLS Certificates (REQUIRED for port 8448)
+tls_certificate_path: "/etc/matrix-synapse/certs/fullchain.pem"
+tls_private_key_path: "/etc/matrix-synapse/certs/privkey.pem"
+
+allowed_push_gateways:
+  - "ntfy.xmsx.dpdns.org"
 EOF
+```
+
+Copy certificate
+
+```
+mkdir /etc/matrix-synapse/certs
+cp /etc/letsencrypt/live/matrix.xmsx.dpdns.org/* /etc/matrix-synapse/certs
 ```
 
 Save and close the file, then restart the Matrix Synapse service to reload the changes.
@@ -222,20 +243,24 @@ Next, create an Nginx virtual host configuration file for Matrix Synapse.
 
 ```
 cat << 'EOF' >> /etc/nginx/conf.d/synapse.conf 
-# -------------------------------------------------
-# Main Synapse Server (Client API + Federation)
-# -------------------------------------------------
+# 1. HTTP to HTTPS Redirection (Port 80)
+server {
+    listen 80;
+    listen [::]:80;
+    server_name matrix.xmsx.dpdns.org;
+
+    # Redirect all HTTP traffic to HTTPS (Port 443)
+    return 301 https://$host$request_uri;
+}
+
+# 2. Main Synapse Server (Client API - Port 443)
 server {
     server_name matrix.xmsx.dpdns.org;
 
     # Client port (HTTPS)
     listen 443 ssl;
     listen [::]:443 ssl;
-    http2 on;
-
-    # Federation port (Matrix standard port)
-    listen 8448 ssl;
-    listen [::]:8448 ssl;
+    http2 on; # Moved http2 on as a separate directive
 
     access_log  /var/log/nginx/synapse.access.log;
     error_log   /var/log/nginx/synapse.error.log;
@@ -248,26 +273,24 @@ server {
     ssl_prefer_server_ciphers on;
     ssl_dhparam /etc/ssl/certs/dhparam.pem;
 
-    # Client & Federation API
+    # Client API Proxy to Synapse 8008
     location /_matrix {
         proxy_pass http://localhost:8008;
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header Host $host;
-
-        # Upload size follows Synapse config
         client_max_body_size 10M;
     }
 
-    # Well-known for client discovery
+    # Well-known for client discovery (Correct and Necessary)
     location /.well-known/matrix/client {
         return 200 '{"m.homeserver": {"base_url": "https://matrix.xmsx.dpdns.org"}}';
         default_type application/json;
         add_header Access-Control-Allow-Origin *;
     }
 
-    # Well-known for federation discovery
+    # Well-known for federation discovery (Correct and Necessary)
     location /.well-known/matrix/server {
-        return 200 '{"m.server": "matrix.xmsx.dpdns.org:8448"}';
+        return 200 '{"m.server": "matrix.xmsx.dpdns.org"}';
         default_type application/json;
         add_header Access-Control-Allow-Origin *;
     }
@@ -285,83 +308,20 @@ You can now verify the Matrix Synapse installation using the URL **<https://matr
 
 Congratulations! You have successfully installed Matrix Synapse on Ubuntu 24.04
 
-Use shell script for  add 、del、list、select
+add user
 
 ```
-cat << 'EOF' >> matrix_user.sh
-#!/bin/bash
-# matrix_user.sh
-# 用法: matrix_user.sh add|del|mod|list 用户名 密码 角色
-# 角色: 1=管理员, 0=普通用户
-# homeserver.db 路径
+register_new_matrix_user -c /etc/matrix-synapse/homeserver.yaml http://localhost:8008
+```
 
-DB="/var/lib/matrix-synapse/homeserver.db"
-CONFIG="/etc/matrix-synapse/homeserver.yaml"
+select user
 
-action=$1
-username=$2
-password=$3
-admin_flag=$4
+```
+sqlite3 /var/lib/matrix-synapse/homeserver.db "SELECT name, admin FROM users;"
+```
 
-case "$action" in
-  add)
-    if [ -z "$username" ] || [ -z "$password" ]; then
-      echo "Usage: $0 add <username> <password> [admin_flag]"
-      exit 1
-    fi
-    # 使用官方命令注册用户，确保密码可用
-    register_new_matrix_user -c "$CONFIG" "http://localhost:8008" <<EOF
-$username
-$password
-EOF
+delete user
 
-    # 设置管理员标记（如果 admin_flag=1）
-    if [ "$admin_flag" = "1" ]; then
-      sqlite3 "$DB" "UPDATE users SET admin=1 WHERE name='@${username}:$(grep 'server_name:' $CONFIG | awk '{print $2}')';"
-    fi
-    echo "User $username added."
-    ;;
-
-  del)
-    if [ -z "$username" ]; then
-      echo "Usage: $0 del <username>"
-      exit 1
-    fi
-    sqlite3 "$DB" "DELETE FROM users WHERE name LIKE '%$username%';"
-    echo "User $username deleted."
-    ;;
-
-  mod)
-    if [ -z "$username" ] || [ -z "$password" ]; then
-      echo "Usage: $0 mod <username> <new_password>"
-      exit 1
-    fi
-    # 官方命令修改密码
-    register_new_matrix_user -c "$CONFIG" "http://localhost:8008" --reset-password <<EOF
-$username
-$password
-EOF
-    echo "Password for $username updated."
-    ;;
-
-  list)
-    sqlite3 "$DB" "SELECT name, admin FROM users;"
-    ;;
-
-  *)
-    echo "Usage: $0 {add|del|mod|list} ..."
-    exit 1
-    ;;
-esac
-# 添加普通用户
-# bash matrix_user.sh add bob mypassword 0
-# # 添加管理员
-# bash matrix_user.sh add alice mypassword 1
-# # 修改密码
-# bash matrix_user.sh mod bob newpassword
-# # 删除用户
-# bash matrix_user.sh del alice
-# # 列出用户
-# bash matrix_user.sh list
-EOF
+```
+sqlite3 /var/lib/matrix-synapse/homeserver.db "DELETE FROM users WHERE name LIKE '%test%';"
 ```
