@@ -177,6 +177,15 @@ sudo snap install --classic certbot
 certbot --version
 ```
 
+modify dns analysis in cloudflare
+
+| Type |        Name         |     IPv4 address      |
+| :--: | :-----------------: | :-------------------: |
+|  A   |          @          |    150.230.215.187    |
+| SRV  | _matrix._tcp.matrix | matrix.xmsx.dpdns.org |
+
+the type SRV  need `_matrix._tcp.matrix` -> `matrix.xmsx.dpdns.org` and open Port 8448
+
 create certs
 
 ```
@@ -320,16 +329,16 @@ Also can test in this website [federationtester](https://federationtester.matrix
 
 Congratulations! You have successfully installed Matrix Synapse on Ubuntu 24.04
 
-add user
-
-```
-register_new_matrix_user -c /etc/matrix-synapse/homeserver.yaml http://localhost:8008
-```
-
 select user
 
 ```
 sqlite3 /var/lib/matrix-synapse/homeserver.db "SELECT name, admin FROM users;"
+```
+
+add user
+
+```
+register_new_matrix_user -c /etc/matrix-synapse/homeserver.yaml http://localhost:8008
 ```
 
 delete user

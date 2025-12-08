@@ -27,6 +27,9 @@ log-level: "info"
 auth-file: "/var/lib/ntfy/user.db" 
 auth-default-access: "deny-all" 
 EOF
+
+sudo chown -R ntfy:ntfy /var/lib/ntfy
+sudo chown ntfy:ntfy /etc/ntfy/server.yml
 ```
 
 可以尝试启动，检查配置是否正确
@@ -57,8 +60,6 @@ sudo ntfy user list
 ntfy access sjwayrhz universal-topic read-write
 如果想允许用户对所有主题进行读写,但是我这里不做这样的设置
 ntfy access sjwayrhz '*' read-write 
-
-chown -R ntfy:ntfy /var/lib/ntfy
 ```
 
 验证是否配置成功
@@ -195,7 +196,7 @@ auth-default-access: "deny-all"
 然后配置nginx里面的配置文件 ntfy.conf
 
 ```
-cat << 'EOF' >> /etc/nginx/conf.d/ntfy.conf
+cat << 'EOF' > /etc/nginx/conf.d/ntfy.conf
 
 # 重定向 HTTP 到 HTTPS (可选，推荐)
 server {
@@ -209,12 +210,13 @@ server {
 
 # HTTPS 配置
 server {
-    listen 443 ssl http2;
+    listen 443 ssl;
+    http2 on;
     server_name ntfy.xmsx.dpdns.org;
 
     # --- SSL 证书配置 (使用您的路径) ---
-    ssl_certificate /etc/letsencrypt/live/ntfy.xmsx.dpdns.org/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/ntfy.xmsx.dpdns.org/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/xmsx.dpdns.org/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/xmsx.dpdns.org/privkey.pem;
 
     # --- ntfy 反向代理配置 ---
     location / {
