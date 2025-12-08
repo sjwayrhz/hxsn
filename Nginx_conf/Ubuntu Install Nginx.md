@@ -32,4 +32,5 @@ To install nginx, run the following commands:
 sudo apt update
 sudo apt install nginx
 sudo systemctl enable --now nginx
+sudo systemctl status nginx
 ```

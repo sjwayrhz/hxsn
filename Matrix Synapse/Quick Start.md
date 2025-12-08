@@ -97,6 +97,7 @@ restart turn
 
 ```shell
 sudo systemctl restart coturn
+sudo systemctl status coturn
 ```
 
 ## Step 4 – Configure Matrix Synapse
@@ -168,12 +169,45 @@ allowed_push_gateways:
 EOF
 ```
 
+ Install the Certbot Let’s Encrypt client using the following commands.
+
+```
+sudo snap install core
+sudo snap install --classic certbot
+certbot --version
+```
+
+create certs
+
+```
+sudo apt install python3-certbot-dns-cloudflare 
+sudo mkdir /etc/ssl/cloudflare
+
+cat << 'EOF' >> /etc/ssl/cloudflare/xmsx.dpdns.org.ini
+dns_cloudflare_api_token = z4Bl2u4iySQJulJAe-3fsO8o3dM6Os_CaRQ5u0Wk
+EOF
+
+chmod 600 /etc/ssl/cloudflare/xmsx.dpdns.org.ini
+
+sudo certbot certonly \
+  --dns-cloudflare \
+  --dns-cloudflare-credentials /etc/ssl/cloudflare/xmsx.dpdns.org.ini \
+  -d xmsx.dpdns.org -d '*.xmsx.dpdns.org'
+```
+
 Copy certificate
 
 ```
 mkdir /etc/matrix-synapse/certs
-cp /etc/letsencrypt/live/matrix.xmsx.dpdns.org/* /etc/matrix-synapse/certs
+cp /etc/letsencrypt/live/xmsx.dpdns.org/* /etc/matrix-synapse/certs
 chown :matrix-synapse  /etc/matrix-synapse/certs/*
+chmod 640 /etc/matrix-synapse/certs/privkey.pem
+```
+
+generate the dhparam using the following command.
+
+```
+openssl dhparam -dsaparam -out /etc/ssl/certs/dhparam.pem 4096
 ```
 
 Save and close the file, then restart the Matrix Synapse service to reload the changes.
@@ -199,32 +233,7 @@ Sending registration request...
 Success!
 ```
 
-## Step 6 – Download Let’s Encrypt SSL
-
-Install the prerequisites: Install nginx
-
-Next, install the Certbot Let’s Encrypt client using the following commands.
-
-```shell
-sudo snap install core
-sudo snap refresh core
-sudo snap install --classic certbot
-sudo ln -s /snap/bin/certbot /usr/bin/certbot
-```
-
-Next, download the Let’s Encrypt SSL for your domain.
-
-```
-certbot certonly --nginx --agree-tos --no-eff-email --staple-ocsp --preferred-challenges http -m sjwayrhz@gmail.com -d matrix.xmsx.dpdns.org
-```
-
-Next, generate the dhparam using the following command.
-
-```
-openssl dhparam -dsaparam -out /etc/ssl/certs/dhparam.pem 4096
-```
-
-## Step 7 – Configure Nginx for Matrix Synapse
+## Step 6 – Configure Nginx for Matrix Synapse
 
 Next, you will need to configure Nginx as a reverse proxy for Matrix Synapse.
 
@@ -267,9 +276,9 @@ server {
     error_log   /var/log/nginx/synapse.error.log;
 
     # TLS config
-    ssl_certificate /etc/letsencrypt/live/matrix.xmsx.dpdns.org/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/matrix.xmsx.dpdns.org/privkey.pem;
-    ssl_trusted_certificate /etc/letsencrypt/live/matrix.xmsx.dpdns.org/chain.pem;
+    ssl_certificate /etc/letsencrypt/live/xmsx.dpdns.org/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/xmsx.dpdns.org/privkey.pem;
+    ssl_trusted_certificate /etc/letsencrypt/live/xmsx.dpdns.org/chain.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
     ssl_dhparam /etc/ssl/certs/dhparam.pem;
