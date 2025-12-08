@@ -287,10 +287,9 @@ server {
     # TLS config
     ssl_certificate /etc/letsencrypt/live/xmsx.dpdns.org/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/xmsx.dpdns.org/privkey.pem;
-    ssl_trusted_certificate /etc/letsencrypt/live/xmsx.dpdns.org/chain.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
-    ssl_dhparam /etc/ssl/certs/dhparam.pem;
+    # ssl_dhparam /etc/ssl/certs/dhparam.pem;
 
     # Client API Proxy to Synapse 8008
     location /_matrix {
