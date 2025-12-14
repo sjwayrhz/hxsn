@@ -1,0 +1,286 @@
+{
+  "name": "daily news AI",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -656,
+        -16
+      ],
+      "id": "1d8198e7-2e89-41cd-8683-68868a3a4e57",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "https://gnews.io/api/v4/search?q=AI&lang=en&apikey=fc9372464ffd2a912275a3574c4a4b39",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -432,
+        -176
+      ],
+      "id": "304f8b55-fc5a-45e7-8ded-ae00fa4ce08a",
+      "name": "Gnews"
+    },
+    {
+      "parameters": {
+        "url": "https://newsapi.org/v2/everything?q=AI&lang=en&from=2025-11-18&sortBy=popularity&apiKey=fc2c9b057d79436fa34293d3e787a6f3",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -432,
+        80
+      ],
+      "id": "e78f8983-c56b-4dba-9114-69c0cd4e336c",
+      "name": "NewsApi"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4ca32c82-afef-4b13-b372-071067f1951e",
+              "name": "news_content",
+              "value": "={{ $json.articles }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -224,
+        80
+      ],
+      "id": "a0c45212-ffa3-437d-bd89-2791344fab53",
+      "name": "格式整理2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4ca32c82-afef-4b13-b372-071067f1951e",
+              "name": "news_content",
+              "value": "={{ $json.articles }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -224,
+        -176
+      ],
+      "id": "a1813aea-facd-4d05-929b-7958e9624c84",
+      "name": "格式整理1"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        80,
+        -48
+      ],
+      "id": "7cb4f42b-215b-4918-8ba3-d2556dcc2ecd",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=你是一个由AI驱动的新闻助手，你的任务是:\n1. 仅从{{ $json.news_content }}中提取15条关于AI技术进展和应用的新闻，其他的内容不要。\n3. 将内容翻译为准确的中文简体，注意，若某些技术词汇普遍使用英文，可保留不翻译成中文。\n3. 确保每条新闻包含其URL。因为是文本输出，所以URL前后不需要括号。\n4. 确保输出内容的第一句提及今天的日期，例如：早上好，这是2025年11月21日的AI新闻。\n5. 对每条新闻提供约300字的摘要描述。",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        288,
+        -48
+      ],
+      "id": "bd806665-f437-4fb4-9196-b13d7a61cde2",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "fromEmail": "sjwayrhz0@gmail.com",
+        "toEmail": "sjwayrhz@hotmail.com ",
+        "subject": "每日新闻",
+        "emailFormat": "text",
+        "text": "={{ $json.output }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        640,
+        -48
+      ],
+      "id": "08985fa9-765e-421a-ba9d-e3c382403935",
+      "name": "Send email",
+      "webhookId": "5567f501-25ae-4eae-9134-1df13e965f87",
+      "notesInFlow": false,
+      "credentials": {
+        "smtp": {
+          "id": "bktY2aBNn3EzNiYI",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "deepseek/deepseek-v3.2",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        160,
+        160
+      ],
+      "id": "63f8fdf5-ebc5-4e3b-9137-40182ce79bea",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "TQULYc6qP8hixMXj",
+          "name": "OpenRouter account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Gnews",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "NewsApi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gnews": {
+      "main": [
+        [
+          {
+            "node": "格式整理1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NewsApi": {
+      "main": [
+        [
+          {
+            "node": "格式整理2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "格式整理1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "格式整理2": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Shanghai",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "86990029-be2c-4724-9ef1-121ebf600bed",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b8a55b7234422db9df9dcca92f13da50399105b29b714783a97e2dda7510039f"
+  },
+  "id": "xkjEhvBdtbWxOBhK",
+  "tags": []
+}

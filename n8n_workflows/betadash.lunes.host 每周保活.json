@@ -1,0 +1,79 @@
+{
+  "name": "betadash.lunes.host 每周保活",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -336,
+        -16
+      ],
+      "id": "674231dd-96a8-423f-af10-f636c45b862e",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "fromEmail": "sjwayrhz8@gmail.com",
+        "toEmail": "sjwayrhz@hotmail.com",
+        "subject": "betadash.lunes.host保活提醒",
+        "html": "<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Server Access Credentials</title>\n</head>\n<body style=\"margin: 0; padding: 0; background-color: #f4f4f5; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;\">\n  <table width=\"100%\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color: #f4f4f5; padding: 40px 0;\">\n    <tr>\n      <td align=\"center\">\n        <!-- Main Card -->\n        <table width=\"600\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); max-width: 100%;\">\n          \n          <!-- Header -->\n          <tr>\n            <td style=\"background-color: #2563eb; padding: 30px; text-align: center;\">\n              <h1 style=\"color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;\">System Access Details</h1>\n              <p style=\"color: #bfdbfe; margin: 10px 0 0 0; font-size: 16px;\">Please save these credentials securely.</p>\n            </td>\n          </tr>\n\n          <!-- Content -->\n          <tr>\n            <td style=\"padding: 40px 30px;\">\n              \n              <!-- Section 1: Primary -->\n              <table width=\"100%\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\">\n                <tr>\n                  <td style=\"padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;\">\n                    <h2 style=\"color: #1f2937; margin: 0 0 15px 0; font-size: 18px;\">🖥️ Primary Access</h2>\n                    <p style=\"color: #4b5563; margin: 0 0 15px 0; font-size: 14px;\">\n                      Login URL: <a href=\"https://betadash.lunes.host/\" style=\"color: #2563eb; text-decoration: none; font-weight: 600;\">https://betadash.lunes.host/</a>\n                    </p>\n                    <table width=\"100%\" bgcolor=\"#f8fafc\" cellpadding=\"15\" style=\"border-radius: 6px; border: 1px solid #e2e8f0;\">\n                      <tr>\n                        <td width=\"30%\" style=\"color: #64748b; font-size: 14px; font-weight: 600;\">Account</td>\n                        <td style=\"color: #0f172a; font-size: 14px; font-family: monospace;\">sjwayrhz@gmail.com</td>\n                      </tr>\n                      <tr>\n                        <td width=\"30%\" style=\"color: #64748b; font-size: 14px; font-weight: 600;\">Password</td>\n                        <td style=\"color: #0f172a; font-size: 14px; font-family: monospace;\">ZL7Bv2OFBJIZW7QE</td>\n                      </tr>\n                    </table>\n                  </td>\n                </tr>\n              </table>\n\n              <!-- Spacer -->\n              <table width=\"100%\" height=\"30\" border=\"0\"><tr><td></td></tr></table>\n\n              <!-- Section 2: Secondary -->\n              <table width=\"100%\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\">\n                <tr>\n                  <td>\n                    <h2 style=\"color: #1f2937; margin: 0 0 15px 0; font-size: 18px;\">☁️ Windows Server (Temp)</h2>\n                    <p style=\"color: #4b5563; margin: 0 0 15px 0; font-size: 14px;\">\n                      Service URL: <a href=\"https://www.apponfly.com/\" style=\"color: #2563eb; text-decoration: none; font-weight: 600;\">https://www.apponfly.com/</a>\n                    </p>\n                    <table width=\"100%\" bgcolor=\"#f8fafc\" cellpadding=\"15\" style=\"border-radius: 6px; border: 1px solid #e2e8f0;\">\n                      <tr>\n                        <td width=\"30%\" style=\"color: #64748b; font-size: 14px; font-weight: 600;\">Account</td>\n                        <td style=\"color: #0f172a; font-size: 14px; font-family: monospace;\">sjwayrhz8@gmail.com</td>\n                      </tr>\n                      <tr>\n                        <td width=\"30%\" style=\"color: #64748b; font-size: 14px; font-weight: 600;\">Password</td>\n                        <td style=\"color: #0f172a; font-size: 14px; font-family: monospace;\">crxmO1VGKKX8QFRn</td>\n                      </tr>\n                    </table>\n                    <p style=\"color: #64748b; font-size: 13px; margin-top: 15px; font-style: italic;\">\n                      Note: Use AppOnFly if temporary Windows environment is needed.\n                    </p>\n                  </td>\n                </tr>\n              </table>\n\n            </td>\n          </tr>\n\n          <!-- Footer -->\n          <tr>\n            <td style=\"background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;\">\n              <p style=\"color: #94a3b8; font-size: 12px; margin: 0;\">\n                Generated securely. Please do not forward this to unauthorized personnel.\n              </p>\n            </td>\n          </tr>\n        </table>\n      </td>\n    </tr>\n  </table>\n</body>\n</html>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        -128,
+        -16
+      ],
+      "id": "79046682-7453-4b19-8a9f-971a23e05136",
+      "name": "Send email",
+      "webhookId": "0b927066-7f08-40f2-bf48-9194c46286fd",
+      "credentials": {
+        "smtp": {
+          "id": "DZe9YDMWiicMwiZu",
+          "name": "SMTP account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f588fb62-72c5-4f23-b080-946681ceac78",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b8a55b7234422db9df9dcca92f13da50399105b29b714783a97e2dda7510039f"
+  },
+  "id": "L7AWikbV5SWonIop",
+  "tags": []
+}
