@@ -93,6 +93,17 @@ sh -c 'echo "$XRAY_CONFIG" > /etc/xray/config.json && /usr/bin/xray -config /etc
 }
 ```
 
+其中，uuid 可以用 [uuid](https://8gwifi.org/uuid.jsp) 来生成，然后privateKey需要在linux里面安装xray，例如：
+
+```shell
+# xray x25519
+PrivateKey: EI78_-w1gk6SC-MgT9S5qTVO4H3r2Ly8L5_y1htD42E
+Password: jcdABKj-F4CRruC-5VR0Y53C2yIEdSq-bd_Ay79-3VM
+Hash32: 9fJpGe8RaMWDm7raH6p4xjNJAifHeCYl_1zda-CzJTM
+```
+
+将PrivateKey-私钥填入上面的json,把Password-公钥填入下面的link里面
+
 ### Depoly
 
 运行成功后，在面板Overview看到TCP proxy是 `URL:PORT`
