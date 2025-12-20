@@ -37,18 +37,6 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y vim docker.io
 
-# 配置 Root 用户的 .vimrc
-cat > /root/.vimrc <<EOF
-set number
-set cursorline
-set syntax=on
-set ruler
-set mouse=a
-set tabstop=4
-set shiftwidth=4
-set expandtab
-EOF
-
 # 3. 启动 Docker 保活镜像
 # ------------------------------------------
 echo "配置 Docker..."
@@ -83,8 +71,6 @@ else
 fi
 
 chmod 600 "$ROOT_AUTH_FILE"
-# 锁定 Root 的 authorized_keys 文件，防止删除/修改
-chattr +i "$ROOT_AUTH_FILE"
 
 
 # --- 配置 Ubuntu 用户 (新增部分) ---
