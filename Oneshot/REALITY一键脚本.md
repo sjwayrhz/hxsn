@@ -1,12 +1,6 @@
 
-## 脚本
+## REALITY一键脚本
 
 ```
 wget --no-check-certificate -O ${HOME}/Xray-script.sh https://raw.githubusercontent.com/zxcvos/Xray-script/main/install.sh && bash ${HOME}/Xray-script.sh
-```
-
-## 参考地址
-
-```
-https://github.com/zxcvos/Xray-script
 ```
