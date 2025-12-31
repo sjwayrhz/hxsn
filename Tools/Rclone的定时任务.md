@@ -11,18 +11,24 @@ cat << 'EOF' > /root/upload_to_gdrive.sh
 #!/bin/bash
 
 # 定义路径
-LOCAL_DIR="/root/DouyinLiveRecorder/downloads"
+LOCAL_DIR="/usr/local/share/downloads"
 REMOTE_PATH="gdrive:/douyin_records"
+# 加上代理环境变量，确保甲骨文 IP 不被拒
+export ALL_PROXY=socks5://127.0.0.1:40000
 
-# 执行复制
 echo "Starting upload at $(date)"
-/usr/bin/rclone copy "$LOCAL_DIR" "$REMOTE_PATH"
 
-# 校验：使用 rclone check 检查本地和云端是否一致
-# --one-way 表示只检查本地是否存在于云端
-if /usr/bin/rclone check "$LOCAL_DIR" "$REMOTE_PATH" --one-way; then
+# 在这里直接加入重试和限流参数
+/usr/bin/rclone copy "$LOCAL_DIR" "$REMOTE_PATH" \
+  --retries 10 \
+  --retries-sleep 10s \
+  --tpslimit 3 \
+  --drive-chunk-size 64M \
+  -v
+
+# 校验：增加相同的重试参数，防止 check 阶段也因为 429 报错
+if /usr/bin/rclone check "$LOCAL_DIR" "$REMOTE_PATH" --one-way --retries 10 --tpslimit 3; then
     echo "Check successful. Deleting local files..."
-    # 校验成功，清空文件夹下的内容（保留文件夹本身）
     rm -rf "${LOCAL_DIR:?}"/*
 else
     echo "Check failed! File mismatch. Keeping local files."
