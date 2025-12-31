@@ -67,10 +67,12 @@ curl -x socks5://127.0.0.1:40000 https://www.cloudflare.com/cdn-cgi/trace
 ```bash
 vim ~/.config/rclone/rclone.conf
 ```
-在你的 [gdrive] 配置块下面添加一行：
+在你的 [gdrive] 配置块下面添加3行：
 在执行命令前加入代理参数：
 
 ```bash
+retries = 10
+retries_sleep = 10s
 proxy_url = socks5://127.0.0.1:40000
 ```
 
