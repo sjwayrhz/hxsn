@@ -17,7 +17,7 @@ BASE_DIR="/root/DouyinLiveRecorder/downloads"
 # 支持自定义多级相对路径
 declare -A FOLDER_TO_PLAYLIST
 FOLDER_TO_PLAYLIST["抖音直播/水水家猪蹄"]="PLaEnOcR3Z1V8V_yLEULP4ArwLygyuhQdG"
-FOLDER_TO_PLAYLIST["tiktok直播/Isa_Uyên-isauyen_official"]="PLaEnOcR3Z1V_dY0BACkGTMqtGXhYA3gJ3"
+FOLDER_TO_PLAYLIST["TikTok直播/Isa_Uyên-isauyen_official"]="PLaEnOcR3Z1V_dY0BACkGTMqtGXhYA3gJ3"
 
 # ===========================================
 
