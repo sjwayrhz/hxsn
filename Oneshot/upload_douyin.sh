@@ -6,7 +6,7 @@
 #   "抖音直播/三七": "PLaEnOcR3Z1V-8KibtiWPXzTGXKC6t-j19"
 # }
 # 配置crontab的任务举例
-# 0 * * * * flock -n /tmp/upload_douyin.lock -c "/bin/bash /usr/local/bin/upload_douyin.sh mp4"
+# 0 * * * * flock -n /tmp/upload_douyin.lock -c "/bin/bash /usr/local/bin/upload_douyin.sh"
 
 # ================= 配置区域 =================
 UPLOADER_BIN="/usr/local/bin/youtubeuploader"
@@ -17,7 +17,6 @@ BASE_DIR="/root/DouyinLiveRecorder/downloads"
 CONFIG_JSON="/usr/local/bin/channels.json"
 
 # --- 参数处理逻辑 ---
-# 获取用户输入的第一个参数，例如: /usr/local/bin/upload_douyin.sh mp4
 TARGET_EXT=$1
 
 if [ -z "$TARGET_EXT" ]; then
@@ -26,7 +25,6 @@ if [ -z "$TARGET_EXT" ]; then
     echo "未指定格式，将扫描所有支持的视频类型..." >> "$LOG_FILE"
 else
     # 如果传了参数 (比如 mp4)，则只匹配该后缀
-    # 注意：这里支持带点或不带点的输入，统一转为 *.ext
     CLEAN_EXT=${TARGET_EXT#.} # 去掉可能的点
     FIND_PATTERN="-name *.$CLEAN_EXT"
     echo "指定上传格式: $CLEAN_EXT" >> "$LOG_FILE"
@@ -48,10 +46,29 @@ jq -r 'to_entries[] | "\(.key)\t\(.value)"' "$CONFIG_JSON" | while IFS=$'\t' rea
     echo ">> 正在检查目录: [${RELATIVE_PATH}]" >> "$LOG_FILE"
 
     # 使用 eval 动态执行带模式的 find 命令
-    # 注意：此处 find 命令根据上面的 FIND_PATTERN 动态生成
     eval "find \"$FULL_PATH\" -type f $FIND_PATTERN -print0" | while IFS= read -r -d '' FILE_PATH; do
 
         FILENAME=$(basename "$FILE_PATH")
+
+        # ================= TS动态文件检测 =================
+        if [[ "${FILENAME##*.}" == "ts" ]]; then
+            # 记录当前文件大小（字节）
+            SIZE_BEFORE=$(stat -c%s "$FILE_PATH" 2>/dev/null)
+            
+            # 等待 3 秒（根据你的网络和录制写入频率，可以适当调整，比如 5）
+            sleep 3
+            
+            # 再次获取文件大小
+            SIZE_AFTER=$(stat -c%s "$FILE_PATH" 2>/dev/null)
+
+            # 如果获取不到大小，或者大小发生变化，说明文件正在动态写入中
+            if [ -z "$SIZE_BEFORE" ] || [ "$SIZE_BEFORE" != "$SIZE_AFTER" ]; then
+                echo "   [$(date +%H:%M:%S)] 跳过动态文件 (正在录制): $FILENAME" >> "$LOG_FILE"
+                continue # 跳过当前文件，进入下一次循环
+            fi
+        fi
+        # ========================================================
+
         echo "   [$(date +%H:%M:%S)] 准备上传: $FILENAME" >> "$LOG_FILE"
 
         UPLOAD_OUTPUT=$(mktemp)
