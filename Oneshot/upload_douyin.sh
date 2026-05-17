@@ -54,9 +54,8 @@ jq -r 'to_entries[] | "\(.key)\t\(.value)"' "$CONFIG_JSON" | while IFS=$'\t' rea
         FILE_SIZE_MB=$(( FILE_SIZE_BYTES / 1024 / 1024 ))
 
         if [ "$FILE_SIZE_MB" -lt "$MIN_SIZE_MB" ]; then
-            echo "   [$(date +%H:%M:%S)] 跳过过小文件: $FILENAME (${FILE_SIZE_MB}MB < ${MIN_SIZE_MB}MB)" >> "$LOG_FILE"
-            # 注意：此处你可以选择 rm -f "$FILE_PATH" 来清理垃圾文件，
-            # 或者直接 continue 保留它。脚本目前默认保留。
+            echo "   [$(date +%H:%M:%S)] 删除小文件: $FILENAME (${FILE_SIZE_MB}MB < ${MIN_SIZE_MB}MB)" >> "$LOG_FILE"
+            rm -f "$FILE_PATH"
             continue
         fi
 
