@@ -79,6 +79,7 @@ jq -r 'to_entries[] | "\(.key)\t\(.value)"' "$CONFIG_JSON" | while IFS=$'\t' rea
           -secrets "$CLIENT_SECRETS" \
           -cache "$REQUEST_TOKEN" \
           -playlistID "$CURRENT_PLAYLIST" \
+          -privacy "unlisted" \
           -filename "$FILE_PATH" >> "$LOG_FILE" 2> "$UPLOAD_OUTPUT"
 
         EXIT_CODE=$?
