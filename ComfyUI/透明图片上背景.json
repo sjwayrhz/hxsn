@@ -1,0 +1,156 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "你的透明底PLC.png"
+    }
+  },
+  "2": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": ["1", 0],
+      "width": 1024,
+      "height": 1024,
+      "scale_type": "lanczos",
+      "crop": "disabled"
+    }
+  },
+  "3": {
+    "class_type": "InvertMask",
+    "inputs": {
+      "mask": ["1", 1]
+    }
+  },
+  "5": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": ["1", 1]
+    }
+  },
+  "6": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": ["5", 0],
+      "width": 1024,
+      "height": 1024,
+      "scale_type": "bicubic",
+      "crop": "disabled"
+    }
+  },
+  "7": {
+    "class_type": "ImageToMask",
+    "inputs": {
+      "image": ["6", 0]
+    }
+  },
+  "8": {
+    "class_type": "VAEEncodeForInpaint",
+    "inputs": {
+      "pixels": ["2", 0],
+      "mask": ["7", 0],
+      "vae": ["9", 2],
+      "grow_mask_by": 2
+    }
+  },
+  "9": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "你的本地模型.safetensors"
+    }
+  },
+  "10": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": ["9", 0],
+      "positive": ["12", 0],
+      "negative": ["13", 0],
+      "latent_image": ["8", 0],
+      "seed": 12345,
+      "steps": 24,
+      "cfg": 7,
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoising": 0.5
+    }
+  },
+  "12": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "professional industrial product photography background, light warm gray studio backdrop, soft gradient from light gray to off-white, subtle curved wall, soft contact shadow under the product, matte reflective floor, even soft box lighting, clean empty studio, no people, no characters, no extra objects",
+      "clip": ["9", 1]
+    }
+  },
+  "13": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "black background, pure white background, human, woman, girl, people, anime, illustration, painting, dark, messy, dim, low contrast, blurry, noisy, watermark, text, logo, animal, character, colorful distractions, deformed objects, transparent product, faded product",
+      "clip": ["9", 1]
+    }
+  },
+  "14": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["10", 0],
+      "vae": ["9", 2]
+    }
+  },
+  "15": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": ["14", 0],
+      "width": 1500,
+      "height": 1500,
+      "scale_type": "lanczos",
+      "crop": "disabled"
+    }
+  },
+  "16": {
+    "class_type": "MaskToImage",
+    "inputs": {
+      "mask": ["3", 0]
+    }
+  },
+  "17": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": ["16", 0],
+      "width": 1500,
+      "height": 1500,
+      "scale_type": "bicubic",
+      "crop": "disabled"
+    }
+  },
+  "18": {
+    "class_type": "ImageToMask",
+    "inputs": {
+      "image": ["17", 0]
+    }
+  },
+  "19": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": ["1", 0],
+      "width": 1500,
+      "height": 1500,
+      "scale_type": "lanczos",
+      "crop": "disabled"
+    }
+  },
+  "20": {
+    "class_type": "ImageCompositeMasked",
+    "inputs": {
+      "destination": ["15", 0],
+      "source": ["19", 0],
+      "mask": ["18", 0],
+      "x": 0,
+      "y": 0
+    }
+  },
+  "21": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": ["20", 0],
+      "prefix": "PLC_背景保留原图透明度_已修复"
+    }
+  }
+}
