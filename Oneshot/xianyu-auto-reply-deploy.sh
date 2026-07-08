@@ -1,10 +1,7 @@
 #!/bin/bash
 # ==========================================
-# 闲鱼自动回复系统 - 一键部署脚本
-# 自动生成远程镜像版 docker-compose.yml 并拉取镜像启动
-# 所有部署产物（.env / docker-compose.yml / 数据 / 日志）
-# 统一存放于 xianyu_auto_reply 目录，便于整体迁移与清理
-# 用法: bash deploy.sh
+# 闲鱼自动回复系统 - 一键部署脚本 (重构优化版)
+# 用法： bash xianyu-auto-reply-deploy.sh
 # ==========================================
 
 set -e
@@ -25,10 +22,18 @@ echo "  闲鱼自动回复系统 - 一键部署"
 echo "=========================================="
 echo ""
 
-# ========== 检查环境 ==========
+# ========== 1. 严格的环境检查 ==========
 if ! command -v docker &> /dev/null; then
-    echo -e "${RED}错误: Docker 未安装，请先安装 Docker${NC}"
-    echo "安装教程: https://docs.docker.com/get-docker/"
+    echo -e "${RED}错误: Docker 未安装，请先执行官方安装脚本。${NC}"
+    echo "curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh"
+    exit 1
+fi
+
+# 检查 Docker 进程是否真正在运行
+if ! docker info &> /dev/null; then
+    echo -e "${RED}错误: Docker 服务未启动或当前用户无权限。${NC}"
+    echo "请尝试运行: sudo systemctl start docker"
+    echo "或将当前用户加入 docker 组: sudo usermod -aG docker \$USER"
     exit 1
 fi
 
@@ -37,40 +42,50 @@ if docker compose version &> /dev/null; then
 elif command -v docker-compose &> /dev/null; then
     DC="docker-compose"
 else
-    echo -e "${RED}错误: Docker Compose 未安装${NC}"
+    echo -e "${RED}错误: Docker Compose 未安装。${NC}"
     exit 1
 fi
 
-export COMPOSE_PROJECT_NAME=xianyu-auto-reply
+# 移除原脚本中硬编码的全局 export，改用标准环境变量传递
 DC_CMD="$DC -f $COMPOSE_FILE --env-file $ENV_FILE"
 
-echo -e "${CYAN}[信息] Docker: $(docker --version)${NC}"
-echo -e "${CYAN}[信息] Compose: $DC${NC}"
+echo -e "${CYAN}[信息] Docker: $(docker --version | awk '{print $3}' | tr -d ',')${NC}"
+echo -e "${CYAN}[信息] Compose: $($DC version | awk '{print $4}')${NC}"
 echo -e "${CYAN}[信息] 项目目录: $PROJECT_DIR${NC}"
 echo ""
 
-# ========== 创建项目目录 ==========
+# ========== 2. 创建项目目录结构 ==========
 mkdir -p "$PROJECT_DIR"
+mkdir -p \
+    "$PROJECT_DIR/mysql/data" \
+    "$PROJECT_DIR/redis/data" \
+    "$PROJECT_DIR/logs/backend_web" \
+    "$PROJECT_DIR/logs/websocket" \
+    "$PROJECT_DIR/logs/scheduler" \
+    "$PROJECT_DIR/static" \
+    "$PROJECT_DIR/backups" \
+    "$PROJECT_DIR/browser_data"
 
-# ========== 生成 .env 配置文件 ==========
+# ========== 3. 生成 .env 配置文件 ==========
 if [ ! -f "$ENV_FILE" ]; then
-    echo -e "${YELLOW}[提示] 首次部署，生成默认配置文件 xianyu_auto_reply/.env${NC}"
+    echo -e "${YELLOW}[提示] 首次部署，生成默认配置文件...${NC}"
     cat > "$ENV_FILE" << 'ENVEOF'
 # ==========================================
 # 闲鱼自动回复系统 - 环境变量配置
 # ==========================================
 
-# MySQL数据库配置（Docker内置，自动创建）
+# 核心修正：将项目名称固化在配置中，与目录名保持一致
+COMPOSE_PROJECT_NAME=xianyu_auto_reply
+
+# MySQL数据库配置
 MYSQL_ROOT_PASSWORD=xianyu@2026
 MYSQL_DATABASE=xianyu_data
 MYSQL_USER=xianyu
 MYSQL_PASSWORD=xianyu@2026
 
-# Redis缓存配置（Docker内置）
+# Redis缓存配置
 REDIS_PASSWORD=xianyu@2026
 REDIS_DB=0
-
-# 说明：JWT 密钥由数据库统一托管（首次启动自动生成并持久化），无需在此配置
 
 # 端口配置
 FRONTEND_PORT=9000
@@ -81,55 +96,35 @@ SCHEDULER_PORT=8091
 # 镜像配置
 IMAGE_REGISTRY=registry.cn-shanghai.aliyuncs.com/zhinian-software
 IMAGE_TAG=latest
-
-# 基础镜像（MySQL / Redis，从阿里云仓库拉取，由 sync_base_images.sh 同步上传）
 MYSQL_IMAGE=registry.cn-shanghai.aliyuncs.com/zhinian-software/xianyu-mysql:8.0
 REDIS_IMAGE=registry.cn-shanghai.aliyuncs.com/zhinian-software/xianyu-redis:7-alpine
 
-# 日志级别
+# 应用配置
 LOG_LEVEL=INFO
-
-# SQL 日志开关：true=打印每条执行的完整 SQL（默认，便于排查）；高并发生产环境可设为 false
 SQL_ECHO=true
-
-# Token过期时间（分钟）
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 REFRESH_TOKEN_EXPIRE_MINUTES=10080
-
-# 定时任务间隔（分钟）
 REDELIVERY_INTERVAL=5
 RATE_INTERVAL=20
-
-# 验证码并发数
 MAX_CAPTCHA_CONCURRENT=3
 ENVEOF
-    echo -e "${GREEN}✓ 已生成 xianyu_auto_reply/.env 文件${NC}"
-    echo -e "${YELLOW}[提示] 如需修改配置（如端口等），请编辑 $ENV_FILE 后重新运行${NC}"
+    echo -e "${GREEN}✓ 已生成 $ENV_FILE${NC}"
     echo ""
 fi
 
-# ========== 生成 docker-compose.yml（远程镜像版） ==========
-echo "[信息] 生成 xianyu_auto_reply/docker-compose.yml（远程镜像版）..."
+# ========== 4. 生成 docker-compose.yml ==========
+echo "[信息] 生成 docker-compose.yml..."
 cat > "$COMPOSE_FILE" << 'COMPOSEEOF'
-# Docker Compose 配置文件 - 远程镜像部署版
-# 闲鱼自动回复系统 - 从镜像仓库拉取预构建镜像
-# 由 deploy.sh 自动生成，请勿手动修改
-# 提示：本文件与所有数据/日志均位于 xianyu_auto_reply 目录内，
-#       可直接 cd 进本目录后使用标准 `docker compose` 命令操作
-
 services:
-  # ====== 基础设施 ======
-
-  # MySQL数据库（默认从阿里云仓库拉取，可通过 MYSQL_IMAGE 覆盖）
   mysql:
     image: ${MYSQL_IMAGE:-registry.cn-shanghai.aliyuncs.com/zhinian-software/xianyu-mysql:8.0}
     container_name: xianyu-mysql
     restart: unless-stopped
     environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-xianyu@2026}
-      - MYSQL_DATABASE=${MYSQL_DATABASE:-xianyu_data}
-      - MYSQL_USER=${MYSQL_USER:-xianyu}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-xianyu@2026}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
       - TZ=Asia/Shanghai
     command:
       - --character-set-server=utf8mb4
@@ -141,20 +136,19 @@ services:
     networks:
       - xianyu-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-xianyu@2026}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 30s
 
-  # Redis缓存（默认从阿里云仓库拉取，可通过 REDIS_IMAGE 覆盖）
   redis:
     image: ${REDIS_IMAGE:-registry.cn-shanghai.aliyuncs.com/zhinian-software/xianyu-redis:7-alpine}
     container_name: xianyu-redis
     restart: unless-stopped
     command: >
       redis-server
-      --requirepass ${REDIS_PASSWORD:-xianyu@2026}
+      --requirepass ${REDIS_PASSWORD}
       --maxmemory 256mb
       --maxmemory-policy allkeys-lru
       --appendonly yes
@@ -165,15 +159,12 @@ services:
     networks:
       - xianyu-network
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-xianyu@2026}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
 
-  # ====== 应用服务（远程镜像） ======
-
-  # Backend-Web 服务
   backend-web:
     image: ${IMAGE_REGISTRY:-registry.cn-shanghai.aliyuncs.com/zhinian-software}/xianyu-backend-web:${IMAGE_TAG:-latest}
     container_name: xianyu-backend-web
@@ -182,27 +173,26 @@ services:
       - ENVIRONMENT=production
       - MYSQL_HOST=mysql
       - MYSQL_PORT=3306
-      - MYSQL_USER=${MYSQL_USER:-xianyu}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-xianyu@2026}
-      - MYSQL_DATABASE=${MYSQL_DATABASE:-xianyu_data}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-xianyu@2026}
-      - REDIS_DB=${REDIS_DB:-0}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_DB=${REDIS_DB}
       - BACKEND_WEB_PORT=8089
       - HOST=0.0.0.0
       - JWT_ALGORITHM=HS256
-      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
-      - REFRESH_TOKEN_EXPIRE_MINUTES=${REFRESH_TOKEN_EXPIRE_MINUTES:-10080}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
+      - REFRESH_TOKEN_EXPIRE_MINUTES=${REFRESH_TOKEN_EXPIRE_MINUTES}
       - CORS_ORIGINS=*
       - WEBSOCKET_SERVICE_URL=http://websocket:8090
       - SCHEDULER_SERVICE_URL=http://scheduler:8091
       - STATIC_DIR=/app/static
       - BACKUP_DIR=/app/backups
-      - BACKEND_WEB_PUBLIC_URL=${BACKEND_WEB_PUBLIC_URL:-}
       - BROWSER_HEADLESS=true
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - SQL_ECHO=${SQL_ECHO:-true}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - SQL_ECHO=${SQL_ECHO}
       - TZ=Asia/Shanghai
     volumes:
       - ./logs/backend_web:/app/backend-web/logs
@@ -217,14 +207,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8089/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
 
-  # WebSocket 服务
   websocket:
     image: ${IMAGE_REGISTRY:-registry.cn-shanghai.aliyuncs.com/zhinian-software}/xianyu-websocket:${IMAGE_TAG:-latest}
     container_name: xianyu-websocket
@@ -233,21 +216,21 @@ services:
       - ENVIRONMENT=production
       - MYSQL_HOST=mysql
       - MYSQL_PORT=3306
-      - MYSQL_USER=${MYSQL_USER:-xianyu}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-xianyu@2026}
-      - MYSQL_DATABASE=${MYSQL_DATABASE:-xianyu_data}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-xianyu@2026}
-      - REDIS_DB=${REDIS_DB:-0}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_DB=${REDIS_DB}
       - WEBSOCKET_PORT=8090
       - HOST=0.0.0.0
-      - MAX_CAPTCHA_CONCURRENT=${MAX_CAPTCHA_CONCURRENT:-3}
+      - MAX_CAPTCHA_CONCURRENT=${MAX_CAPTCHA_CONCURRENT}
       - BROWSER_HEADLESS=true
       - BACKEND_WEB_SERVICE_URL=http://backend-web:8089
       - STATIC_DIR=/app/static
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - SQL_ECHO=${SQL_ECHO:-true}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - SQL_ECHO=${SQL_ECHO}
       - TZ=Asia/Shanghai
     volumes:
       - ./logs/websocket:/app/websocket/logs
@@ -262,16 +245,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      backend-web:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
 
-  # Scheduler 服务
   scheduler:
     image: ${IMAGE_REGISTRY:-registry.cn-shanghai.aliyuncs.com/zhinian-software}/xianyu-scheduler:${IMAGE_TAG:-latest}
     container_name: xianyu-scheduler
@@ -280,23 +254,23 @@ services:
       - ENVIRONMENT=production
       - MYSQL_HOST=mysql
       - MYSQL_PORT=3306
-      - MYSQL_USER=${MYSQL_USER:-xianyu}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-xianyu@2026}
-      - MYSQL_DATABASE=${MYSQL_DATABASE:-xianyu_data}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-xianyu@2026}
-      - REDIS_DB=${REDIS_DB:-0}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_DB=${REDIS_DB}
       - SCHEDULER_PORT=8091
       - HOST=0.0.0.0
-      - REDELIVERY_INTERVAL=${REDELIVERY_INTERVAL:-5}
-      - RATE_INTERVAL=${RATE_INTERVAL:-20}
+      - REDELIVERY_INTERVAL=${REDELIVERY_INTERVAL}
+      - RATE_INTERVAL=${RATE_INTERVAL}
       - WEBSOCKET_SERVICE_URL=http://websocket:8090
       - BACKEND_WEB_SERVICE_URL=http://backend-web:8089
       - STATIC_DIR=/app/static
       - BACKUP_DIR=/app/backups
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - SQL_ECHO=${SQL_ECHO:-true}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - SQL_ECHO=${SQL_ECHO}
       - TZ=Asia/Shanghai
     volumes:
       - ./logs/scheduler:/app/scheduler/logs
@@ -311,18 +285,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      websocket:
-        condition: service_healthy
-      backend-web:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8091/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
 
-  # 前端服务
   frontend:
     image: ${IMAGE_REGISTRY:-registry.cn-shanghai.aliyuncs.com/zhinian-software}/xianyu-frontend:${IMAGE_TAG:-latest}
     container_name: xianyu-frontend
@@ -333,74 +296,18 @@ services:
       - "${FRONTEND_PORT:-9000}:80"
     networks:
       - xianyu-network
-    depends_on:
-      backend-web:
-        condition: service_healthy
 
 networks:
   xianyu-network:
     driver: bridge
 COMPOSEEOF
-echo -e "${GREEN}✓ xianyu_auto_reply/docker-compose.yml 已生成${NC}"
+echo -e "${GREEN}✓ 配置文件已生成${NC}"
 echo ""
 
-# ========== 检测并清理加密版残留 ==========
-ENC_CONTAINERS=(
-    "xianyu-enc-frontend"
-    "xianyu-enc-backend-web"
-    "xianyu-enc-websocket"
-    "xianyu-enc-scheduler"
-    "xianyu-enc-mysql"
-    "xianyu-enc-redis"
-)
-
-enc_found=0
-for container in "${ENC_CONTAINERS[@]}"; do
-    if docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
-        enc_found=1
-        break
-    fi
-done
-
-if [ $enc_found -eq 1 ]; then
-    echo -e "${YELLOW}[信息] 检测到加密版容器，清理中（保留数据卷）...${NC}"
-    for container in "${ENC_CONTAINERS[@]}"; do
-        if docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
-            echo -e "${CYAN}  停止并删除容器: ${container}${NC}"
-            docker stop "$container" 2>/dev/null || true
-            docker rm "$container" 2>/dev/null || true
-        fi
-    done
-    # 清理加密版应用镜像
-    for name in "xianyu-enc-frontend" "xianyu-enc-backend-web" "xianyu-enc-websocket" "xianyu-enc-scheduler"; do
-        image_ids=$(docker images --filter "reference=*/${name}*" --format '{{.ID}}' 2>/dev/null | sort -u)
-        for id in $image_ids; do
-            docker rmi "$id" --force 2>/dev/null || true
-        done
-    done
-    # 清理加密版网络
-    for enc_network in $(docker network ls --format '{{.Name}}' | grep -i "enc" | grep -i "xianyu"); do
-        docker network rm "$enc_network" 2>/dev/null || true
-    done
-    echo -e "${GREEN}✓ 加密版已清理（数据卷已保留）${NC}"
-    echo ""
-fi
-
-# ========== 创建挂载目录 ==========
-mkdir -p \
-    "$PROJECT_DIR/mysql/data" \
-    "$PROJECT_DIR/redis/data" \
-    "$PROJECT_DIR/logs/backend_web" \
-    "$PROJECT_DIR/logs/websocket" \
-    "$PROJECT_DIR/logs/scheduler" \
-    "$PROJECT_DIR/static" \
-    "$PROJECT_DIR/backups" \
-    "$PROJECT_DIR/browser_data"
-
-# ========== 部署 ==========
-echo -e "${YELLOW}步骤 1/3: 停止旧容器（仅本项目）...${NC}"
+# ========== 5. 部署执行 ==========
+echo -e "${YELLOW}步骤 1/3: 清理潜在旧环境...${NC}"
 $DC_CMD down 2>/dev/null || true
-echo -e "${GREEN}✓ 旧容器已清理${NC}"
+echo -e "${GREEN}✓ 环境清理就绪${NC}"
 
 echo ""
 echo -e "${YELLOW}步骤 2/3: 拉取最新镜像...${NC}"
@@ -410,38 +317,29 @@ echo -e "${GREEN}✓ 镜像拉取完成${NC}"
 echo ""
 echo -e "${YELLOW}步骤 3/3: 启动服务...${NC}"
 $DC_CMD up -d
-echo -e "${GREEN}✓ 服务已启动${NC}"
+echo -e "${GREEN}✓ 服务已触发启动指令${NC}"
 
 echo ""
-echo "[信息] 等待服务启动..."
-sleep 15
+echo "[信息] 检查服务运行状态..."
+sleep 5
 $DC_CMD ps
 
-# 读取端口配置
+# 读取端口用于回显
 frontend_port=$(grep -E "^FRONTEND_PORT=" "$ENV_FILE" 2>/dev/null | cut -d '=' -f2 | tr -d '\r' || echo "9000")
 backend_web_port=$(grep -E "^BACKEND_WEB_PORT=" "$ENV_FILE" 2>/dev/null | cut -d '=' -f2 | tr -d '\r' || echo "8089")
-websocket_port=$(grep -E "^WEBSOCKET_PORT=" "$ENV_FILE" 2>/dev/null | cut -d '=' -f2 | tr -d '\r' || echo "8090")
-scheduler_port=$(grep -E "^SCHEDULER_PORT=" "$ENV_FILE" 2>/dev/null | cut -d '=' -f2 | tr -d '\r' || echo "8091")
-
-frontend_port="${frontend_port:-9000}"
-backend_web_port="${backend_web_port:-8089}"
-websocket_port="${websocket_port:-8090}"
-scheduler_port="${scheduler_port:-8091}"
 
 echo ""
 echo -e "${GREEN}=========================================="
-echo "  部署完成！"
+echo "  部署流水线执行完毕！"
 echo "==========================================${NC}"
 echo ""
-echo "服务访问地址："
-echo "  前端:        http://服务器IP:${frontend_port}"
-echo "  Backend-Web: http://服务器IP:${backend_web_port}"
-echo "  WebSocket:   http://服务器IP:${websocket_port}"
-echo "  Scheduler:   http://服务器IP:${scheduler_port}"
+echo "面板访问地址："
+echo "  前端界面: http://服务器IP:${frontend_port}"
+echo "  后端接口: http://服务器IP:${backend_web_port}"
 echo ""
-echo "常用命令（也可直接 cd xianyu_auto_reply 后使用标准 docker compose 命令）："
-echo "  查看日志: $DC_CMD logs -f"
-echo "  停止服务: $DC_CMD down"
-echo "  重启服务: $DC_CMD restart"
-echo "  更新版本: bash update.sh"
+echo -e "${CYAN}💡 运维提示：${NC}"
+echo "  1. 以后管理项目，直接进入目录： cd xianyu_auto_reply"
+echo "  2. 停止并移除容器： docker compose down"
+echo "  3. 重启整个项目： docker compose restart"
+echo "  4. 实时查看日志： docker compose logs -f"
 echo ""
