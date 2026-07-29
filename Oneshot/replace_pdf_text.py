@@ -14,6 +14,8 @@
      372328197010050096   -> 370784198402038219
      17638192436          -> 18968102590
 
+扫描范围：脚本所在目录，以及该目录下所有层级的子目录中的 .pdf / .PDF 文件。
+
 实现思路（尽量让替换后的文字外观与原文一致）：
 1. 用 page.get_text("dict") 取得每处命中文字所在"文字片段(span)"的
    精确字号(size)、颜色(color)、基线位置(origin)。
@@ -218,30 +220,30 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     pdf_files = sorted(
         set(
-            glob.glob(os.path.join(script_dir, "*.pdf"))
-            + glob.glob(os.path.join(script_dir, "*.PDF"))
+            glob.glob(os.path.join(script_dir, "**", "*.pdf"), recursive=True)
+            + glob.glob(os.path.join(script_dir, "**", "*.PDF"), recursive=True)
         )
     )
 
     if not pdf_files:
-        print(f"在目录 {script_dir} 下未找到任何 PDF 文件。")
+        print(f"在目录 {script_dir} 及其子目录下未找到任何 PDF 文件。")
         return
 
-    print(f"共找到 {len(pdf_files)} 个 PDF 文件，开始处理...\n")
+    print(f"共找到 {len(pdf_files)} 个 PDF 文件（含子目录），开始处理...\n")
 
     grand_total = 0
     for path in pdf_files:
-        filename = os.path.basename(path)
+        rel_path = os.path.relpath(path, script_dir)
         try:
             count = process_pdf(path)
         except Exception as e:
-            print(f"[失败] {filename}：处理出错 -> {e}")
+            print(f"[失败] {rel_path}：处理出错 -> {e}")
             continue
 
         if count > 0:
-            print(f"[完成] {filename}：共替换 {count} 处")
+            print(f"[完成] {rel_path}：共替换 {count} 处")
         else:
-            print(f"[跳过] {filename}：未找到需要替换的字符串")
+            print(f"[跳过] {rel_path}：未找到需要替换的字符串")
         grand_total += count
 
     print(f"\n全部处理完毕，共替换 {grand_total} 处。")
