@@ -102,6 +102,7 @@ jq -r 'to_entries[] | "\(.key)\t\(.value)"' "$CONFIG_JSON" | while IFS=$'\t' rea
           -cache "$REQUEST_TOKEN" \
           -playlistID "$CURRENT_PLAYLIST" \
           -privacy "public" \
+          -language "zh-CN" \
           "${DESC_ARGS[@]}" \
           -filename "$FILE_PATH" >> "$LOG_FILE" 2> "$UPLOAD_OUTPUT"
 
