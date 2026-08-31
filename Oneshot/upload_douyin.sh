@@ -12,7 +12,15 @@ REQUEST_TOKEN="/etc/youtube/request.token"
 BASE_DIR="/root/DouyinLiveRecorder/downloads"
 CONFIG_JSON="/usr/local/bin/channels.json"
 MIN_SIZE_MB=100
+DEFAULT_DESC_FILE="/etc/youtube/description.txt"   # 全局默认简介，可不存在
 # ----------------------------------------
+
+# 读取全局默认简介（可选）；若不存在则退回 youtubeuploader 内置默认值
+if [ -f "$DEFAULT_DESC_FILE" ]; then
+    DEFAULT_DESCRIPTION=$(cat "$DEFAULT_DESC_FILE")
+else
+    DEFAULT_DESCRIPTION=""
+fi
 
 # --- 参数处理逻辑 ---
 TARGET_EXT=$1
@@ -42,6 +50,20 @@ jq -r 'to_entries[] | "\(.key)\t\(.value)"' "$CONFIG_JSON" | while IFS=$'\t' rea
     fi
 
     echo ">> 正在检查目录: [${RELATIVE_PATH}]" >> "$LOG_FILE"
+
+    # 该目录（该频道/playlist）专属简介：放在录制目录下，文件名固定为 description.txt
+    DIR_DESC_FILE="${FULL_PATH}/description.txt"
+    if [ -f "$DIR_DESC_FILE" ]; then
+        CURRENT_DESCRIPTION=$(cat "$DIR_DESC_FILE")
+    else
+        CURRENT_DESCRIPTION="$DEFAULT_DESCRIPTION"
+    fi
+
+    # 组装可选的 -description 参数（为空则不传，让 uploader 用它自己的默认值）
+    DESC_ARGS=()
+    if [ -n "$CURRENT_DESCRIPTION" ]; then
+        DESC_ARGS=( -description "$CURRENT_DESCRIPTION" )
+    fi
 
     find "$FULL_PATH" -type f "${FIND_ARGS[@]}" -print0 | while IFS= read -r -d '' FILE_PATH; do
 
@@ -79,7 +101,8 @@ jq -r 'to_entries[] | "\(.key)\t\(.value)"' "$CONFIG_JSON" | while IFS=$'\t' rea
           -secrets "$CLIENT_SECRETS" \
           -cache "$REQUEST_TOKEN" \
           -playlistID "$CURRENT_PLAYLIST" \
-          -privacy "unlisted" \
+          -privacy "public" \
+          "${DESC_ARGS[@]}" \
           -filename "$FILE_PATH" >> "$LOG_FILE" 2> "$UPLOAD_OUTPUT"
 
         EXIT_CODE=$?
@@ -117,3 +140,20 @@ echo "----------- 任务结束: $(date) -----------" >> "$LOG_FILE"
 # }
 # 配置crontab的任务举例
 # 0 * * * * flock -n /tmp/upload_douyin.lock -c "/bin/bash /usr/local/bin/upload_douyin.sh"
+
+# ================= 自定义视频简介说明 =================
+# 优先级：目录专属简介 > 全局默认简介 > youtubeuploader 内置默认值("uploaded by youtubeuploader")
+#
+# 1. 目录专属简介（推荐，按频道/playlist区分）：
+#    在 channels.json 里配置的每个录制目录下放一个 description.txt，例如：
+#      /root/DouyinLiveRecorder/downloads/抖音直播/三七/description.txt
+#    该目录下所有视频上传时都会使用这份简介内容。
+#
+# 2. 全局默认简介：
+#    放在 /etc/youtube/description.txt，当某个目录没有自己的 description.txt 时使用。
+#    /etc/youtube 目前已经存放 client_secrets.json / request.token 等配置，
+#    放在这里符合“配置类文件”的归类，权限也和其他凭据文件一致，问题不大；
+#    如果更想按“数据”而非“凭据”分类，也可以放在 /usr/local/bin 或自建的
+#    /etc/youtube/descriptions/ 子目录下，效果相同，改一下 DEFAULT_DESC_FILE 路径即可。
+#
+# 3. 简介文件是纯文本，支持多行；不需要转义，脚本用 $(cat ...) 原样读取。
