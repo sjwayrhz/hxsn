@@ -11,7 +11,7 @@ CLIENT_SECRETS="/etc/youtube/client_secrets.json"
 REQUEST_TOKEN="/etc/youtube/request.token"
 BASE_DIR="/root/DouyinLiveRecorder/downloads"
 CONFIG_JSON="/usr/local/bin/channels.json"
-MIN_SIZE_MB=100
+MIN_SIZE_MB=300
 DEFAULT_DESC_FILE="/etc/youtube/description.txt"   # 全局默认简介，可不存在
 # ----------------------------------------
 
